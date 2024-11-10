@@ -15,7 +15,7 @@ Before running the server, ensure you have the following:
 1. **Clone or Download the Project**
 
    ```bash
-   git clone <repository-url>
+   git clone <https://github.com/digitalterrene/secretmanager-server.git>
    cd <project-directory>
    ```
 
@@ -60,7 +60,7 @@ This endpoint generates a secret based on a user-supplied **phrase** and **times
 - **Body**:
   ```json
   {
-    "phrase": "b@Sesfhgjk1",
+    "phrase": "strongphrase",
     "timestamp": "1731255347375"
   }
   ```
@@ -140,8 +140,8 @@ The following parameters can be configured via environment variables:
 To configure, update the `.env` file in the project directory:
 
 ```
-SECRET=my-secure-server-side-secret
-PORT=4000
+SECRET = test
+PORT = 4000
 STRETCH_COUNT=10000
 ```
 
