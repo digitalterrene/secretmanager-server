@@ -1,0 +1,28 @@
+{
+  "name": "secretmanager-server",
+  "version": "1.0.0",
+  "description": "This server aims to allow users to generate secure passwords and secrets based on timestamps and easy to remember phrases",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon /index.js"
+  },
+  "keywords": [
+    "secret",
+    "secret-generator",
+    "password",
+    "password-generator",
+    "argon2",
+    "crypto-js"
+  ],
+  "author": "digitalterrene",
+  "license": "ISC",
+  "dependencies": {
+    "argon2": "^0.41.1",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "speakeasy": "^2.0.0"
+  }
+}
