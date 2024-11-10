@@ -16,7 +16,7 @@ Before running the server, ensure you have the following:
 
    ```bash
    git clone <https://github.com/digitalterrene/secretmanager-server.git>
-   cd <project-directory>
+   cd `src`
    ```
 
 2. **Install Dependencies**
