@@ -1,11 +1,20 @@
 const express = require("express");
 const crypto = require("crypto");
+const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 require("dotenv").configDotenv();
 
 const app = express();
 app.use(express.json());
 
+const corsOptions = {
+  origin: ["https://localhost:3000", ""],
+  methods: "POST",
+  optionsSuccessStatus: 200,
+  preflightContinue: false,
+};
+
+app.use(cors(corsOptions));
 // Apply rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
