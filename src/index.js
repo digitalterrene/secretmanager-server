@@ -8,7 +8,7 @@ const app = express();
 app.use(express.json());
 
 const corsOptions = {
-  origin: ["https://localhost:3000", ""],
+  origin: ["http://localhost:3000", "https://secretmanager-client.vercel.app"],
   methods: "POST",
   optionsSuccessStatus: 200,
   preflightContinue: false,
