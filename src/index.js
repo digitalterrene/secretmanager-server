@@ -45,7 +45,7 @@ app.post("/generate-secret", (req, res) => {
   const secret = generateDeterministicSecret(phrase, timestamp);
 
   // Respond for client-side use
-  res.json({ secret });
+  res.json({ secret, phrase, timestamp });
 });
 
 // Function to validate phrase and timestamp inputs
