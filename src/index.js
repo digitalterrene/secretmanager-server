@@ -25,7 +25,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Server-side secret, should be kept confidential
-const SERVER_SECRET = process.env.SECRET; // Must remain constant
+const SERVER_SECRET = `${process.env.SECRET}`; // Must remain constant
 
 // Configurable parameters
 const STRETCH_COUNT = 10000; // Number of additional hashing rounds
