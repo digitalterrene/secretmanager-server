@@ -51,7 +51,7 @@ app.post("/generate-secret", (req, res) => {
 // Function to validate phrase and timestamp inputs
 function validateInputs(phrase, timestamp) {
   const phraseRegex =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/;
 
   // Check if the phrase is strong enough
   if (!phrase || !phraseRegex.test(phrase)) {
