@@ -15,6 +15,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
 // Apply rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -35,9 +36,10 @@ app.post("/generate-secret", (req, res) => {
   const { phrase, timestamp } = req.body;
 
   // Validate inputs
-  if (!validateInputs(phrase, timestamp)) {
+  const validationError = validateInputs(phrase, timestamp);
+  if (validationError) {
     return res.status(400).json({
-      error: "Invalid input. Check phrase, and timestamp.",
+      error: validationError,
     });
   }
 
@@ -55,16 +57,16 @@ function validateInputs(phrase, timestamp) {
 
   // Check if the phrase is strong enough
   if (!phrase || !phraseRegex.test(phrase)) {
-    return false;
+    return "Invalid passphrase. It must contain at least one letter, one number, and one special character, and be at least 6 characters long.";
   }
 
   // Check if timestamp is valid
   if (!timestamp || !/^\d{13}$/.test(timestamp)) {
     // Expecting a 13-digit Unix timestamp
-    return false;
+    return "Invalid timestamp. It should be a 13-digit Unix timestamp.";
   }
 
-  return true;
+  return null; // No errors, inputs are valid
 }
 
 // Deterministic secret generation with hash stretching
