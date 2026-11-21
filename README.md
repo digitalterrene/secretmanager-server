@@ -1,174 +1,217 @@
-# Secure Secret Generation Server
+# SecretManager Server
 
-This server provides an API endpoint to generate a **deterministic secret** based on a user-supplied phrase and timestamp. The server applies several security measures, including rate-limiting, input validation, and hash stretching, to ensure that secret generation is both secure and reliable.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](./LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-Express%204.x-339933?style=flat-square&logo=node.js&logoColor=white)](./src/package.json)
+[![Deployment: Vercel](https://img.shields.io/badge/Deploy-Vercel%20Serverless-000000?style=flat-square&logo=vercel)](./src/vercel.json)
+[![Code Style: Conventional](https://img.shields.io/badge/Commits-Conventional-orange?style=flat-square)](https://www.conventionalcommits.org/)
 
-## Prerequisites
+A stateless, zero-persistence Express.js API that derives **deterministic cryptographic secrets** from a user-supplied passphrase, a 13-digit Unix millisecond timestamp, and a confidential server-side pepper (`SECRET`) using **10,000 rounds of HMAC-SHA256 hash stretching**.
 
-Before running the server, ensure you have the following:
-
-- **Node.js** and **npm** installed on your machine.
-- **dotenv** package for environment variable management.
-- A `.env` file containing the `SECRET` key, which should be kept confidential.
-
-## Installation
-
-1. **Clone or Download the Project**
-
-   ```bash
-   git clone <https://github.com/digitalterrene/secretmanager-server.git>
-   cd `src`
-   ```
-
-2. **Install Dependencies**
-   Run the following command to install necessary dependencies:
-
-   ```bash
-   npm install
-   ```
-
-3. **Create a `.env` file**
-   Inside the project directory, create a `.env` file and define the `SECRET` environment variable, which will be used for generating the secret.
-   Example:
-
-   ```
-   SECRET=my-secure-server-side-secret
-   PORT=4000
-   ```
-
-4. **Run the Server**
-   Start the server using the following command:
-
-   ```bash
-   npm start
-   ```
-
-   The server will be running on the port specified in the `.env` file (`PORT`), and you can now make API requests.
+Because secrets are deterministically recomputed on demand rather than stored in a database, there is no credential vault to breach or synchronize.
 
 ---
 
-## API Endpoints
+## ⚡ Quick Start
 
-### POST `/generate-secret`
+Boot the local server in 3 steps:
 
-This endpoint generates a secret based on a user-supplied **phrase** and **timestamp**. The server validates the inputs, applies hashing, and returns a deterministic secret.
+```bash
+# 1. Clone the repository and enter the application directory
+git clone https://github.com/digitalterrene/secretmanager-server.git
+cd secretmanager-server/src
 
-#### Request Format
+# 2. Configure environment variables
+cp example.env .env
+# Edit .env and set a strong, constant SECRET value and PORT (default: 4000)
 
-- **Method**: POST
-- **Endpoint**: `/generate-secret`
-- **Content-Type**: `application/json`
-- **Body**:
-  ```json
-  {
-    "phrase": "strongphrase",
-    "timestamp": "1731255347375"
-  }
-  ```
+# 3. Install dependencies and start the server
+npm install
+node index.js
+```
 
-#### Request Body Parameters
-
-- **phrase** (string, required): A strong password phrase that must contain at least one uppercase letter, one lowercase letter, one number, and one special character.
-- **timestamp** (string, required): A valid Unix timestamp in milliseconds (13 digits).
-
-#### Response Format
-
-- **Status Code**: 200 (OK) if successful.
-- **Body**:
-
-  ```json
-  {
-    "secret": "<deterministic-secret>"
-  }
-  ```
-
-- **Status Code**: 400 (Bad Request) if inputs are invalid.
-- **Body**:
-  ```json
-  {
-    "error": "Invalid input. Check phrase, and timestamp."
-  }
-  ```
-
-#### Example Request
+Verify the server is deriving secrets:
 
 ```bash
 curl -X POST http://localhost:4000/generate-secret \
--H "Content-Type: application/json" \
--d '{"phrase": "b@Sesfhgjk1", "timestamp": "1731255347375"}'
+  -H "Content-Type: application/json" \
+  -d '{"phrase": "b@Sesfhgjk1", "timestamp": "1731255347375"}'
 ```
 
-#### Example Response
-
-```json
-{
-  "secret": "3fcf2bbfa2c60222039de129fb0d50968844f35114ad16eb40be68c19fdfdcaf"
-}
-```
+> [!NOTE]
+> `src/package.json` defines `"start": "nodemon /index.js"`. On Linux/macOS/Windows, use `node index.js` or `npx nodemon index.js` from inside `src/` if the leading slash resolves to filesystem root on your OS.
 
 ---
 
-## Security Features
+## 🏗️ System Architecture
 
-1. **Rate Limiting**
+```mermaid
+flowchart LR
+    Client["Web Client<br/>(localhost:3000 /<br/>secretmanager-delta.vercel.app)"]
+    Edge["Vercel Edge /<br/>HTTPS Ingress"]
+    CORS["CORS Middleware<br/>(Origin Allowlist, POST)"]
+    RL["Rate Limiter<br/>(100 req / 15 min / IP)"]
+    Val["Input Validator<br/>(Phrase & Timestamp Regex)"]
+    KDF["HMAC-SHA256<br/>Stretching Engine<br/>(10,000 Iterations)"]
+    Env[("SERVER_SECRET<br/>(process.env.SECRET)")]
 
-   - The server uses rate limiting to protect against excessive requests from a single IP address.
-   - The rate limit is set to 100 requests per 15 minutes.
+    Client -->|"POST /generate-secret"| Edge
+    Edge --> CORS
+    CORS --> RL
+    RL --> Val
+    Val -->|"Valid"| KDF
+    Env -.->|"HMAC Key + Seed"| KDF
+    KDF -->|"200 OK (JSON)"| Client
+    Val -.->|"Invalid → 400"| Client
+    RL -.->|"Exceeded → 429"| Client
+```
 
-2. **Input Validation**
+### Documentation Architecture (4-Tier Hierarchy)
 
-   - The `phrase` must meet certain complexity requirements, including:
-     - At least one uppercase letter (`A-Z`).
-     - At least one lowercase letter (`a-z`).
-     - At least one digit (`0-9`).
-     - At least one special character (`@$!%*?&`).
-   - The `timestamp` must be a valid 13-digit Unix timestamp in milliseconds.
-
-3. **Hash Stretching**
-   - To further secure the generated secret, **hash stretching** is applied. The server uses HMAC-SHA256 to hash the combination of the `phrase`, `timestamp`, and `SERVER_SECRET` multiple times (10,000 iterations by default).
-   - This makes the process computationally expensive for attackers, making brute-force attempts more difficult.
+| Tier | Document | Purpose |
+|---|---|---|
+| **Tier 1: Governance** | [CONTRIBUTING.md](./CONTRIBUTING.md) · [SECURITY.md](./SECURITY.md) · [docs/git-standards.md](./docs/git-standards.md) | Onboarding, branching, Conventional Commits, vulnerability reporting |
+| **Tier 2: Architecture** | [System Design](./docs/architecture/system-design.md) · [Data Model & API Contracts](./docs/architecture/data-model.md) · [Security Architecture](./docs/architecture/security-and-rbac.md) | Component topology, sequence diagrams, DTO contracts, threat model |
+| **Tier 3: Decisions** | [ADR Index](./docs/adr/README.md) ([ADR-001](./docs/adr/ADR-001-stateless-deterministic-secret-derivation.md), [ADR-002](./docs/adr/ADR-002-hmac-sha256-hash-stretching.md), [ADR-003](./docs/adr/ADR-003-vercel-serverless-express-deployment.md)) | Immutable records of architectural trade-offs |
+| **Tier 4: Runbooks** | [Deployment Verification](./docs/runbooks/deployment-verification.md) · [Incident Response](./docs/runbooks/incident-response.md) | Copy-paste smoke tests, Vercel deployment checks, triage flowcharts |
 
 ---
 
-## Configuration
+## 📡 API Reference
 
-The following parameters can be configured via environment variables:
+### `POST /generate-secret`
 
-- **SECRET**: The server-side secret, which must remain constant and confidential. This is used in conjunction with the `phrase` and `timestamp` to generate the secret.
-- **PORT**: The port the server will listen on. Default is `4000`.
-- **STRETCH_COUNT**: The number of hash iterations for secret generation. Default is `10000`. This can be increased for additional security.
+Derives a deterministic 64-character hexadecimal secret from `phrase`, `timestamp`, and the server-side `SECRET`.
 
-To configure, update the `.env` file in the project directory:
+#### Request Body (`application/json`)
 
-```
-SECRET = test
-PORT = 4000
-STRETCH_COUNT=10000
-```
+| Field | Type | Required | Validation Rules |
+|---|---|---|---|
+| `phrase` | `string` | Yes | Minimum 6 characters; at least one letter (`a-zA-Z`), one digit (`0-9`), and one special character from `@$!%*?&`; only characters in `[A-Za-z\d@$!%*?&]` |
+| `timestamp` | `string` | Yes | Exactly 13 numeric digits (`^\d{13}$`), representing a Unix timestamp in milliseconds |
 
----
+#### Responses
 
-## Rate Limiting
-
-- The rate limiting is set to allow **100 requests per IP** within a **15-minute window**. If the limit is exceeded, the server will respond with a `429 Too Many Requests` status code and a message:
+- **`200 OK`** — Deterministic secret generated:
   ```json
   {
-    "message": "Too many requests, please try again later."
+    "secret": "3fcf2bbfa2c60222039de129fb0d50968844f35114ad16eb40be68c19fdfdcaf",
+    "phrase": "b@Sesfhgjk1",
+    "timestamp": "1731255347375"
   }
   ```
+- **`400 Bad Request`** — Validation failure:
+  ```json
+  {
+    "error": "Invalid passphrase. It must contain at least one letter, one number, and one special character, and be at least 6 characters long."
+  }
+  ```
+  or
+  ```json
+  {
+    "error": "Invalid timestamp. It should be a 13-digit Unix timestamp."
+  }
+  ```
+- **`429 Too Many Requests`** — Rate limit exceeded (100 requests per 15-minute window per IP):
+  ```text
+  Too many requests, please try again later.
+  ```
+
+### `POST /`
+
+Basic server liveness response registered on startup:
+
+- **`200 OK`**: `Server running on port <PORT>`
 
 ---
 
-## Error Handling
+## 🛠️ Tech Stack & Repository Structure
 
-- **400 Bad Request**: Occurs when the `phrase` or `timestamp` is invalid or does not meet the required format.
-- **429 Too Many Requests**: Occurs when the rate limit is exceeded.
+| Layer | Technology | Role |
+|---|---|---|
+| Runtime | Node.js (CommonJS) | Server runtime |
+| HTTP Framework | Express `^4.21.1` | Routing and JSON middleware |
+| Cryptography | Node.js `crypto` (HMAC-SHA256) | 10,000-round deterministic hash stretching |
+| Access Control | `cors` `^2.8.5` | Strict origin allowlist (`POST` only) |
+| Abuse Protection | `express-rate-limit` `^7.4.1` | IP-based fixed-window throttling (100 req / 15 min) |
+| Configuration | `dotenv` `^16.4.5` | Local `.env` loading |
+| Hosting | Vercel (`@vercel/node`) | Serverless production deployment |
+
+```text
+secretmanager-server/
+├── .github/
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md
+│   │   └── feature_request.md
+│   └── PULL_REQUEST_TEMPLATE.md
+├── docs/
+│   ├── adr/                          # Tier 3: Architecture Decision Records
+│   │   ├── README.md
+│   │   ├── ADR-000-template.md
+│   │   ├── ADR-001-stateless-deterministic-secret-derivation.md
+│   │   ├── ADR-002-hmac-sha256-hash-stretching.md
+│   │   └── ADR-003-vercel-serverless-express-deployment.md
+│   ├── architecture/                 # Tier 2: System & Security Specifications
+│   │   ├── system-design.md
+│   │   ├── data-model.md
+│   │   └── security-and-rbac.md
+│   ├── runbooks/                     # Tier 4: Operational & Triage Runbooks
+│   │   ├── deployment-verification.md
+│   │   └── incident-response.md
+│   └── git-standards.md              # Tier 1: Git & Commit Non-Negotiables
+├── src/
+│   ├── example.env                   # Environment variable schema
+│   ├── index.js                      # Express application & crypto engine
+│   ├── package.json                  # Dependencies & scripts
+│   ├── package-lock.json             # Locked dependency graph
+│   ├── README.md                     # Pointer to root documentation
+│   └── vercel.json                   # Vercel serverless routing config
+├── .gitignore                        # Hardened secret & artifact exclusions
+├── CONTRIBUTING.md                   # Contribution workflow & standards
+├── LICENSE                           # MIT License
+├── README.md                         # This document
+└── SECURITY.md                       # Responsible disclosure & SLAs
+```
 
 ---
 
-## Security Considerations
+## ⚙️ Environment Configuration
 
-1. **Environment Variables**: Keep the `SECRET` confidential and do not expose it in your codebase. Use environment variables to manage sensitive information.
-2. **Hashing and Salt**: The server uses hash stretching (HMAC with SHA-256) to secure the secret generation process, which is computationally intensive to prevent brute-force attacks.
-3. **Rate Limiting**: The rate limiting helps mitigate automated attacks by restricting the number of requests an IP can make within a time frame.
+Copy [`src/example.env`](./src/example.env) to `src/.env` for local development. In production, configure these in your Vercel project settings.
+
+| Variable | Description | Required | Default |
+|---|---|---|---|
+| `SECRET` | Server-side pepper and HMAC-SHA256 key. **Must remain constant** — changing it alters every derived secret. | Yes | None |
+| `PORT` | TCP port for local Express HTTP listener | Yes (local) | `4000` (in `example.env`) |
+
+> [!WARNING]
+> **Never commit `.env` files or production `SECRET` values to version control.** Losing or rotating `SECRET` permanently changes all deterministic outputs for every user.
 
 ---
+
+## 🧪 Verification & Hygiene Audits
+
+Run the repository hygiene audit from the repository root:
+
+```bash
+node .agents/skills/senior-repo-standards/scripts/audit-hygiene.js
+```
+
+For full endpoint smoke tests, determinism checks, CORS preflight checks, and rate-limit verification, follow the [Deployment Verification Runbook](./docs/runbooks/deployment-verification.md).
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions. Please review [CONTRIBUTING.md](./CONTRIBUTING.md) and [docs/git-standards.md](./docs/git-standards.md) before opening a Pull Request.
+
+---
+
+## 🛡️ Security
+
+To report security vulnerabilities responsibly, review [SECURITY.md](./SECURITY.md). For the cryptographic threat model and hardening checklist, see [docs/architecture/security-and-rbac.md](./docs/architecture/security-and-rbac.md).
+
+---
+
+## 📄 License
+
+This repository is licensed under the [MIT License](./LICENSE).
